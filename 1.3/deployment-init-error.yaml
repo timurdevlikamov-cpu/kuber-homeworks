@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-with-init
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-app
+  template:
+    metadata:
+      labels:
+        app: nginx-app
+    spec:
+      # Инициализирующий контейнер
+      initContainers:
+      - name: wait-for-service
+        image: busybox:1.28
+        command: ['sh', '-c', "until wget -q --spider http://my-nginx-service; do echo waiting for service; sleep 2; done"]
+      
+      # Основной контейнер
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+        ports:
+        - containerPort: 80
