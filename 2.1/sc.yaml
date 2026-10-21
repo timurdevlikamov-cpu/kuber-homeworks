@@ -1,0 +1,80 @@
+# --- СЕКЦИЯ ХРАНИЛИЩА ---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage-sc
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-storage-sc
+  hostPath:
+    path: "/mnt/data"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-storage-sc
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-container-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storage-test
+  template:
+    metadata:
+      labels:
+        app: storage-test
+    spec:
+      containers:
+      - name: busybox
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            while true; do
+              echo "Data written at $(date)" >> /data/log.txt;
+              sleep 5;
+            done
+        volumeMounts:
+        - name: shared-data
+          mountPath: /data
+      - name: multitool
+        image: wbitt/network-multitool
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            while true; do
+              echo "--- Reading from shared volume ---";
+              cat /data/log.txt;
+              sleep 5;
+            done
+        volumeMounts:
+        - name: shared-data
+          mountPath: /data
+      volumes:
+      - name: shared-data
+        persistentVolumeClaim:
+          claimName: local-pvc
